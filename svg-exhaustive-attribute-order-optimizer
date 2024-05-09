@@ -1,0 +1,55 @@
+#!/usr/bin/env python
+import subprocess
+import collections
+import itertools
+import os
+from lxml import etree
+import sys
+
+
+def get_brotli_size(svg_file):
+    proc = subprocess.run(["brotli", "--best", '--stdout', svg_file], stdout=subprocess.PIPE)
+    return len(proc.stdout)
+
+
+def reorder_attributes(svg_file):
+    """Reorder SVG attributes and compare compressed sizes"""
+    original_size = get_brotli_size(svg_file)
+    best_order = None
+    best_size = original_size
+
+    parser = etree.XMLParser(remove_blank_text=True)
+    tree = etree.parse(svg_file, parser)
+    root = tree.getroot()
+
+    elements = list(root.iter())
+    element_permutations = [list(itertools.permutations(element.attrib.items())) for element in elements]
+
+    for permutations in itertools.product(*element_permutations):
+        permutations = [collections.OrderedDict(permutation) for permutation in permutations]
+
+        for element, permutation in zip(elements, permutations):
+            element.attrib.clear()
+            element.attrib.update(permutation)
+
+        with open(svg_file + ".tmp", "wb") as f:
+            tree.write(f)
+
+        size = get_brotli_size(svg_file + ".tmp")
+        if size < best_size:
+            best_order = permutation
+            best_size = size
+            os.rename(svg_file + ".tmp", svg_file)
+            print(f"{filename}: {best_size} ({best_size - original_size})")
+        else:
+            os.remove(svg_file + ".tmp")
+
+    return best_order, best_size
+
+
+if __name__ == "__main__":
+    for filename in sys.argv[1:]:
+        if not filename.endswith('.svg'):
+            continue
+
+        best_order, best_size = reorder_attributes(filename)
