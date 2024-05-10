@@ -5,6 +5,11 @@ import itertools
 import os
 from lxml import etree
 import sys
+import math
+
+
+MAX_COMPLEXITY = 250_000
+PROGRESS_LINE = 1000
 
 
 def get_brotli_size(svg_file):
@@ -23,8 +28,17 @@ def reorder_attributes(svg_file):
     root = tree.getroot()
 
     elements = list(root.iter())
+    count = 1
+    for element in elements:
+        count *= math.factorial(len(element.attrib))
+
+    if count > MAX_COMPLEXITY:
+        print(f"{filename}: Too complex ({count} permutations)")
+        return
+
     element_permutations = [list(itertools.permutations(element.attrib.items())) for element in elements]
 
+    i = 0
     for permutations in itertools.product(*element_permutations):
         permutations = [collections.OrderedDict(permutation) for permutation in permutations]
 
@@ -35,6 +49,10 @@ def reorder_attributes(svg_file):
         with open(svg_file + ".tmp", "wb") as f:
             tree.write(f)
 
+        i += 1
+        if i % PROGRESS_LINE == 0:
+            print(f"{filename}: {i} / {count}")
+
         size = get_brotli_size(svg_file + ".tmp")
         if size < best_size:
             best_order = permutation
@@ -44,12 +62,10 @@ def reorder_attributes(svg_file):
         else:
             os.remove(svg_file + ".tmp")
 
-    return best_order, best_size
-
 
 if __name__ == "__main__":
     for filename in sys.argv[1:]:
         if not filename.endswith('.svg'):
             continue
 
-        best_order, best_size = reorder_attributes(filename)
+        reorder_attributes(filename)
