@@ -20,7 +20,6 @@ def get_brotli_size(svg_file):
 def reorder_attributes(svg_file):
     """Reorder SVG attributes and compare compressed sizes"""
     original_size = get_brotli_size(svg_file)
-    best_order = None
     best_size = original_size
 
     parser = etree.XMLParser(remove_blank_text=True)
@@ -55,7 +54,6 @@ def reorder_attributes(svg_file):
 
         size = get_brotli_size(svg_file + ".tmp")
         if size < best_size:
-            best_order = permutation
             best_size = size
             os.rename(svg_file + ".tmp", svg_file)
             print(f"{filename}: {best_size} ({best_size - original_size})")
